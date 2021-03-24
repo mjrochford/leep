@@ -5,6 +5,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+Vector2 Vector2Polate(Vector2 curr, Vector2 dest, float t)
+{
+    float dx = dest.x - curr.x;
+    float dy = dest.y - curr.y;
+    return (Vector2){
+        .x = curr.x + (dx)*0.5 * t * t + dx * t,
+        .y = curr.y + (dy)*0.5 * t * t + dy * t,
+    };
+}
+
 const float GRAVITY = 0.3;
 
 const size_t PLAYER_VEL_TRANSITION_FRAMES = 30;
@@ -61,7 +71,7 @@ void messagesPut(const char *m)
 
     messages[(messagesIndex + messagesLen) % MAX_MESSAGES_LEN] = m;
     messagesLen += 1;
-    messagesDebug(false);
+    // messagesDebug(false);
 }
 
 bool messagesIsEmpty() { return messagesLen == 0; }
@@ -94,26 +104,14 @@ void playerUpdate(Player *p)
     p->pos.x += p->vel.x;
     p->pos.y += p->vel.y;
 
-    if (Vector2Length(p->vel) == 0) {
-        return;
-    }
+    if (p->velTransitionTime > 0) {
+        Vector2 newVel = Vector2Polate(
+            p->vel, p->targetVel,
+            1 - (p->velTransitionTime / (float)PLAYER_VEL_TRANSITION_FRAMES));
 
-    if (p->velTransitionTime > 0) { // need to speed up
-        // linear
-        //
-        // vel {mag dir} -> max {mag dir}
-        // ratio = currentFrame / transistionLength
-        // vel + (ratio * dFrame{max / transistionLength, dir})
-        //
-        // [-------<----------------------]
-        //         └─ p->velRamp          └─ PLAYER_VEL_TRANSITION_FRAMES
-        Vector2 newVel = Vector2Lerp(p->vel, p->targetVel,
-                                     (float)PLAYER_VEL_TRANSITION_FRAMES /
-                                         p->velTransitionTime);
+        p->velTransitionTime -= 1;
         p->vel = newVel;
-    }
-
-    if (p->velTransitionTime == -1) {
+    } else {
         p->vel = Vector2Scale(p->vel, 0.9);
     }
 }
@@ -137,23 +135,16 @@ void playerMove(Player *p, Vector2 direction)
 {
     static int moveNum = 0;
 
-    if (p->maxVel / Vector2Length(direction) >= 1.0) {
+    p->velTransitionTime = PLAYER_VEL_TRANSITION_FRAMES;
+
+    if (p->maxVel / Vector2Length(direction) < 1.0) {
         direction = Vector2Scale(Vector2Normalize(direction), p->maxVel);
     }
 
-    if (p->velTransitionTime == -1) {
-        p->velTransitionTime = PLAYER_VEL_TRANSITION_FRAMES;
-    }
-
     moveNum += 1;
-    // works
-    if (Vector2Length(p->vel) < 1e-1) {
-        p->vel = direction;
-    }
-
     p->targetVel = direction;
 
-    messagesNew("vel: {%.2f, %.2f}", p->vel.x, p->vel.y);
+    // messagesNew("vel: {%.2f, %.2f}", p->vel.x, p->vel.y);
 }
 
 // Global varibales
@@ -188,7 +179,11 @@ void setup()
         .rotation = 0,
         .zoom = 1,
     };
-    player = (Player){.radius = 10, .maxVel = 10};
+    player = (Player){
+        .radius = 10,
+        .maxVel = 10,
+        .velTransitionTime = -1,
+    };
 
     directionVector = (Vector2){0};
 }
@@ -200,13 +195,18 @@ void update()
     // playerVel.y += GRAVITY;
     playerUpdate(&player);
 
-    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         Vector2 m = GetScreenToWorld2D(GetMousePosition(), playerCam);
 
-        messagesNew("mouse clicked at {%.2f, %.2f}", m.x, m.y);
+        messagesNew("mouse clicked v = {%.2f, %.2f}", m.x, m.y);
 
         directionVector = Vector2Subtract(m, player.pos);
         playerMove(&player, directionVector);
+    }
+
+    if (!IsKeyDown(KEY_W) && !IsKeyDown(KEY_A) && !IsKeyDown(KEY_S) &&
+        !IsKeyDown(KEY_D)) {
+        // playerStop(&player);
     }
 
     switch (GetKeyPressed()) {
@@ -237,22 +237,17 @@ void update()
         player.pos.x += 10;
         break;
     case KEY_W:
-        playerMove(&player, (Vector2){0, -1});
+        playerMove(&player, (Vector2){0, -10});
         break;
     case KEY_A:
-        playerMove(&player, (Vector2){-1, 0});
+        playerMove(&player, (Vector2){-10, 0});
         break;
     case KEY_S:
-        playerMove(&player, (Vector2){0, 1});
+        playerMove(&player, (Vector2){0, 10});
         break;
     case KEY_D:
-        playerMove(&player, (Vector2){1, 0});
+        playerMove(&player, (Vector2){10, 0});
         break;
-    }
-
-    if (!IsKeyDown(KEY_W) && !IsKeyDown(KEY_A) && !IsKeyDown(KEY_S) &&
-        !IsKeyDown(KEY_D)) {
-        playerStop(&player);
     }
 }
 
@@ -271,6 +266,11 @@ void draw()
     DrawText(TextFormat("{%.2f, %.2f} %i", player.vel.x, player.vel.y,
                         player.velTransitionTime),
              playerCam.target.x, playerCam.target.y, FONT_SIZE, BLACK);
+
+    DrawText(TextFormat("{%.2f, %.2f} %i", player.targetVel.x,
+                        player.targetVel.y, player.velTransitionTime),
+             playerCam.target.x, playerCam.target.y + FONT_SIZE, FONT_SIZE,
+             BLACK);
 
     DrawCircleV(player.pos, player.radius, BLACK);
 

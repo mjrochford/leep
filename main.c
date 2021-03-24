@@ -111,7 +111,7 @@ void playerUpdate(Player *p)
 
         p->velTransitionTime -= 1;
         p->vel = newVel;
-    } else {
+    } else if (p->velTransitionTime == -1) {
         p->vel = Vector2Scale(p->vel, 0.9);
     }
 }
@@ -130,7 +130,12 @@ void messagesNew(const char *fmt, ...)
     messagesPut(buff);
 }
 
-void playerStop(Player *p) { p->velTransitionTime = -1; }
+void playerStop(Player *p)
+{
+    if (p->velTransitionTime == 0) {
+        p->velTransitionTime = -1;
+    }
+}
 void playerMove(Player *p, Vector2 direction)
 {
     static int moveNum = 0;
@@ -205,11 +210,20 @@ void update()
     }
 
     if (!IsKeyDown(KEY_W) && !IsKeyDown(KEY_A) && !IsKeyDown(KEY_S) &&
-        !IsKeyDown(KEY_D)) {
-        // playerStop(&player);
+        !IsKeyDown(KEY_D) && !IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        playerStop(&player);
     }
 
     switch (GetKeyPressed()) {
+        // need more button events to make it work the way i intend
+        // ideally it should call playerMove on only the first time
+        // that the button is IsKeyDown(), however that is not how
+        // GetKeyPressed is implemented so
+        //
+        // additionally playerMove should also be called onmousemove
+        // however i will need to track the coordinates of the mouse
+        // and setup some sort of event system in order for that to
+        // work properly because raylib does not support that
     case KEY_R:
         setup();
         while (!messagesIsEmpty()) {

@@ -74,7 +74,7 @@ void messagesPut(const char *m)
     // messagesDebug(false);
 }
 
-bool messagesIsEmpty() { return messagesLen == 0; }
+static inline bool messagesIsEmpty() { return messagesLen == 0; }
 
 const char *messagesGet()
 {
@@ -215,15 +215,15 @@ void update()
     }
 
     switch (GetKeyPressed()) {
-        // need more button events to make it work the way i intend
-        // ideally it should call playerMove on only the first time
-        // that the button is IsKeyDown(), however that is not how
-        // GetKeyPressed is implemented so
-        //
-        // additionally playerMove should also be called onmousemove
-        // however i will need to track the coordinates of the mouse
-        // and setup some sort of event system in order for that to
-        // work properly because raylib does not support that
+    // need more button events to make it work the way i intend
+    // ideally it should call playerMove on only the first time
+    // that the button is IsKeyDown(), however that is not how
+    // GetKeyPressed is implemented so
+    //
+    // additionally playerMove should also be called onmousemove
+    // however i will need to track the coordinates of the mouse
+    // and setup some sort of event system in order for that to
+    // work properly because raylib does not support that
     case KEY_R:
         setup();
         while (!messagesIsEmpty()) {
@@ -271,7 +271,7 @@ void draw()
 
     ClearBackground(WHITE);
     BeginMode2D(playerCam);
-    DrawRectangle(-6000, 320, 13000, 8000, DARKGRAY);
+    DrawRectangle(-6000, 590, 13000, 8000, DARKGRAY);
 
     for (int i = 0; i < MAX_BUILDINGS; i++) {
         DrawRectangleRec(buildings[i], buildColors[i]);
@@ -333,20 +333,42 @@ void draw()
 
             size_t textWidth = MeasureText(nextMessage, FONT_SIZE);
 
-            DrawRectangle(textX - paddingLeft, textY - paddingTop,
-                          textWidth + (paddingLeft + paddingRight),
-                          FONT_SIZE + (paddingTop + paddingBottom),
-                          (Color){25, 25, 25, 39});
-            DrawText(nextMessage, textX, textY, FONT_SIZE, BLACK);
+            if (textY >= (int)FONT_SIZE) {
+                DrawRectangle(textX - paddingLeft, textY - paddingTop,
+                              textWidth + (paddingLeft + paddingRight),
+                              FONT_SIZE + (paddingTop + paddingBottom),
+                              (Color){25, 25, 25, 39});
+                DrawText(nextMessage, textX, textY, FONT_SIZE, BLACK);
+            }
         }
     }
 
     DrawText(TextFormat("%.2f", GetTime()), 10, 10, FONT_SIZE, GREEN);
+    DrawFPS(GetScreenWidth() - 100, 10);
+}
+
+static inline void CenterWindow(int monitorNumber)
+{
+    float monitorWidth = GetMonitorWidth(monitorNumber);
+    float monitorHeight = GetMonitorHeight(monitorNumber);
+    Vector2 monitorPos = GetMonitorPosition(monitorNumber);
+
+    SetWindowPosition(
+        monitorPos.x + (monitorWidth / 2) - ((float)GetScreenWidth() / 2),
+        monitorPos.y + (monitorHeight / 2) - ((float)GetScreenHeight() / 2));
 }
 
 int init()
 {
-    InitWindow(600, 400, "leep");
+
+    size_t n_mon = GetMonitorCount();
+    for (size_t i = 0; i < n_mon; i++) {
+        printf("mons[%li] = %s\n", i, GetMonitorName(i));
+    }
+
+    InitWindow(1280, 720, "leep");
+    SetWindowState(FLAG_WINDOW_RESIZABLE);
+    CenterWindow(0);
 
     SetTargetFPS(60);
     return 1;
